@@ -3,7 +3,8 @@
 An internal learning resource for Takanock employees to get started with Claude and AI tools at work.
 
 ## 🔗 Access the site
-[👉 Open the AI Learning Hub](https://yourusername.github.io/takanock-ai-hub)
+[👉 Open the AI Learning Hub](https://ivy-m-8.github.io/Takanock_AI_Onboarding
+))
 > Replace the link above with your actual GitHub Pages URL once the site is live.
 
 ## 📚 What's inside
