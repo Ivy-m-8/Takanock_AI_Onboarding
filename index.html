@@ -610,7 +610,7 @@ Always end your answer with something like "→ Head to the [Page Name] page in 
 If the question is outside the hub's scope, say so briefly and suggest they contact the AI team (Ivan, Ivy, or Mia).`;
 
   try {
-    const res = await fetch('https://tak-it-help.vercel.app/api/claude', {
+    const res = await fetch('https://takanock-ai-onboarding-101.vercel.app/api/claude', {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
       body: JSON.stringify({
