@@ -1,3 +1,15 @@
+const STOPWORDS = new Set(['the', 'a', 'an', 'to', 'for', 'our', 'your', 'and', 'of', 'in', 'on', 'is', 'are', 'do', 'i', 'how', 'what', 'does']);
+
+function wordOverlap(a, b) {
+  const wordsA = new Set(a.toLowerCase().split(/\s+/).filter(w => w && !STOPWORDS.has(w)));
+  const wordsB = new Set(b.toLowerCase().split(/\s+/).filter(w => w && !STOPWORDS.has(w)));
+  if (wordsA.size === 0 || wordsB.size === 0) return 0;
+  const [smaller, larger] = wordsA.size <= wordsB.size ? [wordsA, wordsB] : [wordsB, wordsA];
+  let intersection = 0;
+  for (const w of smaller) if (larger.has(w)) intersection++;
+  return intersection / smaller.size;
+}
+
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
@@ -37,22 +49,33 @@ export default async function handler(req, res) {
       return res.status(200).json({ skipped: true });
     }
 
-    // Step 2: look for an existing record with this canonical topic
-    const escaped = canonical.replace(/'/g, "\\'");
-    const searchRes = await fetch(
-      `${airtableUrl}?filterByFormula=${encodeURIComponent(`{Question} = '${escaped}'`)}`,
-      { headers: { Authorization: `Bearer ${AIRTABLE_TOKEN}` } }
-    );
-    if (!searchRes.ok) {
-      const detail = await searchRes.text();
-      console.error('Airtable search failed:', searchRes.status, detail);
-      return res.status(500).json({ error: 'Airtable search failed', detail });
+    // Step 2: fetch all existing topics and compare via word overlap instead of asking the model to judge matches
+    const listRes = await fetch(`${airtableUrl}?fields%5B%5D=Question`, {
+      headers: { Authorization: `Bearer ${AIRTABLE_TOKEN}` }
+    });
+    if (!listRes.ok) {
+      const detail = await listRes.text();
+      console.error('Airtable list failed:', listRes.status, detail);
+      return res.status(500).json({ error: 'Airtable list failed', detail });
     }
-    const searchData = await searchRes.json();
-    const existing = searchData.records?.[0];
+    const listData = await listRes.json();
+
+    let existing = null;
+    let bestScore = 0;
+    for (const record of listData.records || []) {
+      const topic = record.fields.Question;
+      if (!topic) continue;
+      const score = wordOverlap(canonical, topic);
+      if (score >= 0.5 && score > bestScore) {
+        bestScore = score;
+        existing = record;
+      }
+    }
+
     const today = new Date().toISOString().split('T')[0];
 
     if (existing) {
+      const matchedTopic = existing.fields.Question;
       const newCount = (existing.fields.Count || 1) + 1;
       const updateRes = await fetch(`${airtableUrl}/${existing.id}`, {
         method: 'PATCH',
@@ -64,7 +87,7 @@ export default async function handler(req, res) {
         console.error('Airtable update failed:', updateRes.status, detail);
         return res.status(500).json({ error: 'Airtable update failed', detail });
       }
-      return res.status(200).json({ canonical, count: newCount, isFaq: newCount >= 3 });
+      return res.status(200).json({ canonical: matchedTopic, count: newCount, isFaq: newCount >= 3 });
     } else {
       const createRes = await fetch(airtableUrl, {
         method: 'POST',
