@@ -604,9 +604,14 @@
     <p>Ask a question about Claude, AI tools, or anything covered in this hub. I'll answer briefly and point you to the right place.</p>
   </div>
   <div id="faq-section" style="margin-bottom:1.5rem">
-    <h2 style="font-size:16px;font-weight:600;color:var(--text-primary);margin:0 0 0.75rem 0">Frequently Asked Questions</h2>
-    <div id="faq-list" style="display:flex;flex-direction:column;gap:0.5rem">
-      <p style="font-size:13px;color:var(--text-muted);margin:0">Loading…</p>
+    <h2 onclick="toggleFaqSection()" style="font-size:16px;font-weight:600;color:var(--text-primary);margin:0 0 0.75rem 0;cursor:pointer;display:flex;align-items:center;gap:0.5rem">
+      Frequently Asked Questions
+      <i id="faq-chevron" class="ti ti-chevron-down" style="font-size:18px;transition:transform 0.2s"></i>
+    </h2>
+    <div id="faq-content" style="display:none">
+      <div id="faq-list" style="display:flex;flex-direction:column;gap:0.5rem">
+        <p style="font-size:13px;color:var(--text-muted);margin:0">Loading…</p>
+      </div>
     </div>
   </div>
   <div style="background:var(--white);border:0.5px solid var(--border);border-radius:12px;overflow:hidden">
@@ -639,7 +644,23 @@
     if (page) page.classList.add('active');
     if (el) el.classList.add('active');
     window.scrollTo(0, 0);
-    if (id === 'help') loadFaqs();
+  }
+  let faqsLoaded = false;
+  function toggleFaqSection() {
+    const content = document.getElementById('faq-content');
+    const chevron = document.getElementById('faq-chevron');
+    const isOpen = content.style.display === 'block';
+    if (isOpen) {
+      content.style.display = 'none';
+      chevron.style.transform = 'rotate(0deg)';
+    } else {
+      content.style.display = 'block';
+      chevron.style.transform = 'rotate(180deg)';
+      if (!faqsLoaded) {
+        faqsLoaded = true;
+        loadFaqs();
+      }
+    }
   }
   async function loadFaqs() {
     const list = document.getElementById('faq-list');
