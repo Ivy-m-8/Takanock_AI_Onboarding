@@ -43,24 +43,39 @@ export default async function handler(req, res) {
       `${airtableUrl}?filterByFormula=${encodeURIComponent(`{Question} = '${escaped}'`)}`,
       { headers: { Authorization: `Bearer ${AIRTABLE_TOKEN}` } }
     );
+    if (!searchRes.ok) {
+      const detail = await searchRes.text();
+      console.error('Airtable search failed:', searchRes.status, detail);
+      return res.status(500).json({ error: 'Airtable search failed', detail });
+    }
     const searchData = await searchRes.json();
     const existing = searchData.records?.[0];
     const today = new Date().toISOString().split('T')[0];
 
     if (existing) {
       const newCount = (existing.fields.Count || 1) + 1;
-      await fetch(`${airtableUrl}/${existing.id}`, {
+      const updateRes = await fetch(`${airtableUrl}/${existing.id}`, {
         method: 'PATCH',
         headers: { Authorization: `Bearer ${AIRTABLE_TOKEN}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({ fields: { Count: newCount, 'Is FAQ': newCount >= 3, 'Last Asked': today } })
       });
+      if (!updateRes.ok) {
+        const detail = await updateRes.text();
+        console.error('Airtable update failed:', updateRes.status, detail);
+        return res.status(500).json({ error: 'Airtable update failed', detail });
+      }
       return res.status(200).json({ canonical, count: newCount, isFaq: newCount >= 3 });
     } else {
-      await fetch(airtableUrl, {
+      const createRes = await fetch(airtableUrl, {
         method: 'POST',
         headers: { Authorization: `Bearer ${AIRTABLE_TOKEN}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({ fields: { Question: canonical, Count: 1, 'Is FAQ': false, 'Last Asked': today } })
       });
+      if (!createRes.ok) {
+        const detail = await createRes.text();
+        console.error('Airtable create failed:', createRes.status, detail);
+        return res.status(500).json({ error: 'Airtable create failed', detail });
+      }
       return res.status(200).json({ canonical, count: 1, isFaq: false });
     }
   } catch (err) {
