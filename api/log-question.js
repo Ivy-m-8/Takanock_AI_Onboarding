@@ -44,6 +44,9 @@ export default async function handler(req, res) {
     const normData = await normRes.json();
     const canonical = (normData.content?.[0]?.text || question).trim().slice(0, 120);
 
+    // TEMP DEBUG — remove before committing
+    console.log('DEBUG existingTopics:', JSON.stringify(existingTopics), '| raw canonical:', JSON.stringify(normData.content?.[0]?.text));
+
     // Skip non-questions (greetings, small talk, etc.) — don't write them to Airtable
     if (canonical.toUpperCase() === 'SKIP') {
       return res.status(200).json({ skipped: true });
