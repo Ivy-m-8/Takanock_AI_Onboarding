@@ -50,7 +50,7 @@ export default async function handler(req, res) {
     }
 
     // Step 2: fetch all existing topics and compare via word overlap instead of asking the model to judge matches
-    const listRes = await fetch(`${airtableUrl}?fields%5B%5D=Question`, {
+    const listRes = await fetch(`${airtableUrl}?fields%5B%5D=Question&fields%5B%5D=Count`, {
       headers: { Authorization: `Bearer ${AIRTABLE_TOKEN}` }
     });
     if (!listRes.ok) {
