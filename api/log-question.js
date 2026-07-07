@@ -14,19 +14,7 @@ export default async function handler(req, res) {
   const airtableUrl = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${encodeURIComponent(AIRTABLE_TABLE)}`;
 
   try {
-    // Step 1: fetch all existing canonical topics so Haiku can reuse one instead of coining a near-duplicate
-    const listRes = await fetch(airtableUrl, {
-      headers: { Authorization: `Bearer ${AIRTABLE_TOKEN}` }
-    });
-    if (!listRes.ok) {
-      const detail = await listRes.text();
-      console.error('Airtable list failed:', listRes.status, detail);
-      return res.status(500).json({ error: 'Airtable list failed', detail });
-    }
-    const listData = await listRes.json();
-    const existingTopics = (listData.records || []).map(r => r.fields.Question).filter(Boolean);
-
-    // Step 2: match the question to an existing topic (or propose a new one) using Haiku (fast + cheap)
+    // Step 1: normalize the question into a short canonical topic using Haiku (fast + cheap)
     const normRes = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
@@ -35,24 +23,21 @@ export default async function handler(req, res) {
         'anthropic-version': '2023-06-01'
       },
       body: JSON.stringify({
-        model: 'claude-sonnet-5',
+        model: 'claude-haiku-4-5-20251001',
         max_tokens: 40,
-        system: 'You match user questions to a canonical FAQ topic. You will be given a new user question and a list of existing canonical topics. Err on the side of matching — if the new question is asking about the same general subject as an existing topic, even with different specific wording, treat it as a match. For example, \'MCP Server Options And Features\' and \'What MCPs Exist For Our Use\' are the SAME topic (both about available MCP connectors) and should match. Only propose a new topic if the subject matter is genuinely different, not just differently worded. If there\'s a match, respond with that EXISTING topic\'s text EXACTLY as given — do not alter it. If the new question is not a genuine question or help request (greetings, small talk, thanks, test messages), respond with exactly: SKIP. Otherwise respond with a new short canonical topic (5-8 words, title case, no punctuation). Respond with ONLY the topic text or SKIP, nothing else.',
-        messages: [{ role: 'user', content: `Existing topics:\n${existingTopics.map(t => `- ${t}`).join('\n') || '(none yet)'}\n\nNew question: ${question}` }]
+        system: 'You normalize user questions into a short canonical topic (5-8 words, title case, no punctuation) so similar phrasings map to the same string. Example: "how do i download cowork" and "where do i get cowork" should both become "How To Install Cowork". If the input is NOT a genuine question or help request — greetings like "hello", small talk, "thanks", "test", or anything with no real informational content — respond with exactly: SKIP. Otherwise respond with ONLY the canonical topic, nothing else.',
+        messages: [{ role: 'user', content: question }]
       })
     });
     const normData = await normRes.json();
     const canonical = (normData.content?.[0]?.text || question).trim().slice(0, 120);
-
-    // TEMP DEBUG — remove before committing
-    console.log('DEBUG existingTopics:', JSON.stringify(existingTopics), '| raw canonical:', JSON.stringify(normData.content?.[0]?.text));
 
     // Skip non-questions (greetings, small talk, etc.) — don't write them to Airtable
     if (canonical.toUpperCase() === 'SKIP') {
       return res.status(200).json({ skipped: true });
     }
 
-    // Step 3: look for an existing record with this canonical topic
+    // Step 2: look for an existing record with this canonical topic
     const escaped = canonical.replace(/'/g, "\\'");
     const searchRes = await fetch(
       `${airtableUrl}?filterByFormula=${encodeURIComponent(`{Question} = '${escaped}'`)}`,
